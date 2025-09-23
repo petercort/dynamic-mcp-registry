@@ -6,7 +6,10 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
+    "start:https": "USE_HTTPS=true node src/index-https.js",
     "dev": "node --watch src/index.js",
+    "dev:https": "USE_HTTPS=true node --watch src/index-https.js",
+    "generate-certs": "node scripts/generate-certs.js",
     "test": "node --test",
     "lint": "eslint src/",
     "format": "prettier --write src/"

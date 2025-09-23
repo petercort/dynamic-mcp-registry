@@ -1,4 +1,8 @@
 import express from 'express';
+import https from 'https';
+import http from 'http';
+import fs from 'fs';
+import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -6,13 +10,15 @@ import mcpServersRouter from './routes/mcpServers.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
+const USE_HTTPS = process.env.USE_HTTPS === 'true' || process.env.NODE_ENV === 'development';
 
 // Security middleware
 const connectSrcSources = ["'self'", "https:", "ws:"];
 
 // Add localhost for development
 if (process.env.NODE_ENV !== 'production') {
-  connectSrcSources.push("http://localhost:3000", "http://localhost:*");
+  connectSrcSources.push("http://localhost:3000", "http://localhost:*", "https://localhost:*");
 }
 
 // Add any additional allowed sources from environment variable
@@ -85,6 +91,10 @@ app.get('/', (req, res) => {
 
 // OpenAPI/Swagger documentation endpoint
 app.get('/api/docs', (req, res) => {
+  const baseUrl = req.secure || req.headers['x-forwarded-proto'] === 'https' 
+    ? `https://${req.get('host')}`
+    : `${req.protocol}://${req.get('host')}`;
+    
   const openApiSpec = {
     openapi: '3.0.3',
     info: {
@@ -102,7 +112,7 @@ app.get('/api/docs', (req, res) => {
     },
     servers: [
       {
-        url: `${req.protocol}://${req.get('host')}`,
+        url: baseUrl,
         description: 'Current API server'
       }
     ],
@@ -420,12 +430,65 @@ app.use('*', (req, res) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Dynamic MCP Registry API is running on port ${PORT}`);
-  console.log(`📖 API Documentation: http://localhost:${PORT}/api/docs`);
-  console.log(`🔍 Health Check: http://localhost:${PORT}/api/v0/health`);
-  console.log(`📋 MCP Servers: http://localhost:${PORT}/api/v0/servers`);
-});
+// Function to start HTTP server
+function startHttpServer() {
+  app.listen(PORT, () => {
+    console.log(`🚀 Dynamic MCP Registry API (HTTP) is running on port ${PORT}`);
+    console.log(`📖 API Documentation: http://localhost:${PORT}/api/docs`);
+    console.log(`🔍 Health Check: http://localhost:${PORT}/api/v0/health`);
+    console.log(`📋 MCP Servers: http://localhost:${PORT}/api/v0/servers`);
+  });
+}
+
+// Function to start HTTPS server
+function startHttpsServer() {
+  const certsPath = path.join(process.cwd(), 'certs');
+  const keyPath = path.join(certsPath, 'key.pem');
+  const certPath = path.join(certsPath, 'cert.pem');
+
+  // Check if certificates exist
+  if (!fs.existsSync(keyPath) || !fs.existsSync(certPath)) {
+    console.log('⚠️  SSL certificates not found. Run: node scripts/generate-certs.js');
+    console.log('📁 Certificates should be at:', certsPath);
+    console.log('🔄 Falling back to HTTP server...\n');
+    startHttpServer();
+    return;
+  }
+
+  try {
+    const options = {
+      key: fs.readFileSync(keyPath),
+      cert: fs.readFileSync(certPath)
+    };
+
+    https.createServer(options, app).listen(HTTPS_PORT, () => {
+      console.log(`🚀 Dynamic MCP Registry API (HTTPS) is running on port ${HTTPS_PORT}`);
+      console.log(`📖 API Documentation: https://localhost:${HTTPS_PORT}/api/docs`);
+      console.log(`🔍 Health Check: https://localhost:${HTTPS_PORT}/api/v0/health`);
+      console.log(`📋 MCP Servers: https://localhost:${HTTPS_PORT}/api/v0/servers`);
+      console.log(`🔒 Using self-signed certificate (browsers will show warning)`);
+    });
+
+    // Also start HTTP server for redirect
+    http.createServer((req, res) => {
+      res.writeHead(301, { Location: `https://localhost:${HTTPS_PORT}${req.url}` });
+      res.end();
+    }).listen(PORT, () => {
+      console.log(`🔄 HTTP redirect server running on port ${PORT} -> HTTPS ${HTTPS_PORT}`);
+    });
+
+  } catch (error) {
+    console.error('❌ Error starting HTTPS server:', error.message);
+    console.log('🔄 Falling back to HTTP server...\n');
+    startHttpServer();
+  }
+}
+
+// Start the appropriate server
+if (USE_HTTPS) {
+  startHttpsServer();
+} else {
+  startHttpServer();
+}
 
 export default app;
