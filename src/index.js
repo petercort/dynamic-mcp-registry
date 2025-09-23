@@ -35,7 +35,7 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/api/v0/health', (req, res) => {
   res.status(200).json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -52,20 +52,20 @@ app.get('/', (req, res) => {
     version: process.env.npm_package_version || '1.0.0',
     documentation: {
       openapi: '/api/docs',
-      health: '/health'
+      health: '/api/v0/health'
     },
     endpoints: {
-      'GET /api/mcp-servers': 'Get all MCP servers',
-      'GET /api/mcp-servers/:id': 'Get specific MCP server',
+      'GET /api/v0/servers': 'Get all MCP servers',
+      'GET /api/v0/servers/:id': 'Get specific MCP server',
       'GET /api/mcp-servers/:id/config': 'Get MCP server configuration',
       'GET /api/mcp-servers/:id/tools': 'Get MCP server tools'
     },
     examples: {
-      'Get all servers': '/api/mcp-servers',
-      'Get servers by tag': '/api/mcp-servers?tags=github,automation',
-      'Get servers by capability': '/api/mcp-servers?capability=browser',
-      'Get GitHub server': '/api/mcp-servers/github-mcp-server',
-      'Get Playwright server': '/api/mcp-servers/playwright-mcp-server'
+      'Get all servers': '/api/v0/servers',
+      'Get servers by tag': '/api/v0/servers?tags=github,automation',
+      'Get servers by capability': '/api/v0/servers?capability=browser',
+      'Get GitHub server': '/api/v0/servers/github-mcp-server',
+      'Get Playwright server': '/api/v0/servers/playwright-mcp-server'
     }
   });
 });
@@ -94,7 +94,7 @@ app.get('/api/docs', (req, res) => {
       }
     ],
     paths: {
-      '/api/mcp-servers': {
+      '/api/v0/servers': {
         get: {
           summary: 'Get all MCP servers',
           description: 'Retrieve all available MCP servers in the registry with optional filtering',
@@ -132,14 +132,12 @@ app.get('/api/docs', (req, res) => {
               }
             },
             {
-              name: 'offset',
+              name: 'cursor',
               in: 'query',
-              description: 'Offset for pagination',
+              description: 'Cursor for pagination',
               required: false,
               schema: {
-                type: 'integer',
-                minimum: 0,
-                default: 0
+                type: 'string'
               }
             }
           ],
@@ -172,9 +170,9 @@ app.get('/api/docs', (req, res) => {
                             type: 'integer',
                             example: 50
                           },
-                          offset: {
-                            type: 'integer',
-                            example: 0
+                          cursor: {
+                            type: 'string',
+                            example: null
                           }
                         }
                       }
@@ -186,7 +184,7 @@ app.get('/api/docs', (req, res) => {
           }
         }
       },
-      '/api/mcp-servers/{id}': {
+      '/api/v0/servers/{id}': {
         get: {
           summary: 'Get specific MCP server',
           description: 'Retrieve a specific MCP server by ID',
@@ -199,6 +197,16 @@ app.get('/api/docs', (req, res) => {
               schema: {
                 type: 'string',
                 example: 'github-mcp-server'
+              }
+            },
+            {
+              name: 'version',
+              in: 'query',
+              required: false,
+              description: 'Specific version of the MCP server',
+              schema: {
+                type: 'string',
+                example: '1.0.0'
               }
             }
           ],
@@ -374,7 +382,7 @@ app.get('/api/docs', (req, res) => {
 });
 
 // Mount API routes
-app.use('/api/mcp-servers', mcpServersRouter);
+app.use('/api/v0/servers', mcpServersRouter);
 
 // Global error handler
 app.use((err, req, res, next) => {
@@ -403,8 +411,8 @@ app.use('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Dynamic MCP Registry API is running on port ${PORT}`);
   console.log(`📖 API Documentation: http://localhost:${PORT}/api/docs`);
-  console.log(`🔍 Health Check: http://localhost:${PORT}/health`);
-  console.log(`📋 MCP Servers: http://localhost:${PORT}/api/mcp-servers`);
+  console.log(`🔍 Health Check: http://localhost:${PORT}/api/v0/health`);
+  console.log(`📋 MCP Servers: http://localhost:${PORT}/api/v0/servers`);
 });
 
 export default app;
