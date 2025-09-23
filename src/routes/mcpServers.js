@@ -4,7 +4,7 @@ import { mcpServers } from '../data/mcpServers.js';
 const router = express.Router();
 
 /**
- * @api {get} /api/mcp-servers Get all MCP servers
+ * @api {get} /api/v0/servers Get all MCP servers
  * @apiName GetMCPServers
  * @apiGroup MCPServers
  * @apiDescription Retrieve all available MCP servers in the registry
@@ -12,7 +12,7 @@ const router = express.Router();
  * @apiParam {String} [tags] Filter by comma-separated tags
  * @apiParam {String} [capability] Filter by specific capability
  * @apiParam {Number} [limit] Limit number of results (default: 50)
- * @apiParam {Number} [offset] Offset for pagination (default: 0)
+ * @apiParam {String} [cursor] Cursor for pagination
  * 
  * @apiSuccess {Object[]} servers Array of MCP server definitions
  * @apiSuccess {String} servers.id Unique identifier for the server
@@ -35,7 +35,7 @@ const router = express.Router();
  *         "servers": [...],
  *         "total": 2,
  *         "limit": 50,
- *         "offset": 0
+ *         "cursor": null
  *       }
  *     }
  */
@@ -59,12 +59,27 @@ router.get('/', (req, res) => {
       );
     }
     
-    // Pagination
+    // Pagination with cursor support
     const limit = Math.min(parseInt(req.query.limit) || 50, 100);
-    const offset = parseInt(req.query.offset) || 0;
+    const cursor = req.query.cursor || null;
     const total = filteredServers.length;
     
+    // For simplicity, implementing cursor as base64 encoded offset
+    // In production, this would be a more sophisticated cursor implementation
+    let offset = 0;
+    if (cursor) {
+      try {
+        offset = parseInt(Buffer.from(cursor, 'base64').toString());
+      } catch (e) {
+        offset = 0;
+      }
+    }
+    
     const paginatedServers = filteredServers.slice(offset, offset + limit);
+    
+    // Generate next cursor
+    const nextOffset = offset + limit;
+    const nextCursor = nextOffset < total ? Buffer.from(nextOffset.toString()).toString('base64') : null;
     
     res.json({
       success: true,
@@ -72,7 +87,7 @@ router.get('/', (req, res) => {
         servers: paginatedServers,
         total,
         limit,
-        offset
+        cursor: nextCursor
       }
     });
   } catch (error) {
@@ -87,12 +102,13 @@ router.get('/', (req, res) => {
 });
 
 /**
- * @api {get} /api/mcp-servers/:id Get specific MCP server
+ * @api {get} /api/v0/servers/:id Get specific MCP server
  * @apiName GetMCPServer
  * @apiGroup MCPServers
  * @apiDescription Retrieve a specific MCP server by ID
  * 
  * @apiParam {String} id Unique identifier of the MCP server
+ * @apiParam {String} [version] Specific version of the MCP server
  * 
  * @apiSuccess {Object} server MCP server definition
  * @apiSuccess {String} server.id Unique identifier for the server
@@ -130,6 +146,7 @@ router.get('/', (req, res) => {
 router.get('/:id', (req, res) => {
   try {
     const { id } = req.params;
+    const requestedVersion = req.query.version;
     const server = mcpServers.find(s => s.id === id);
     
     if (!server) {
@@ -142,10 +159,17 @@ router.get('/:id', (req, res) => {
       });
     }
     
+    // If a specific version is requested, check if it matches
+    // For now, just add a warning if version doesn't match current version
+    let responseServer = { ...server };
+    if (requestedVersion && requestedVersion !== server.version) {
+      responseServer.versionNote = `Requested version ${requestedVersion} not available. Returning current version ${server.version}.`;
+    }
+    
     res.json({
       success: true,
       data: {
-        server
+        server: responseServer
       }
     });
   } catch (error) {
