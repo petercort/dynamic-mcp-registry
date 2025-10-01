@@ -154,27 +154,108 @@ Each MCP server includes:
 
 ## Deployment
 
-### Environment Variables
+### Best Practice: Docker Compose with HTTPS
 
-- `PORT` - Server port (default: 3000)
-- `NODE_ENV` - Environment (development/production)
-- `ALLOWED_ORIGINS` - Comma-separated allowed CORS origins
+This is the recommended production deployment method. It uses Docker Compose with Traefik as a reverse proxy to automatically handle SSL/TLS certificates via Let's Encrypt.
 
-### Docker Deployment
+#### Prerequisites
 
-```dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY src/ ./src/
-EXPOSE 3000
-CMD ["npm", "start"]
+- Docker and Docker Compose installed
+- A domain name pointing to your server
+- Ports 80 and 443 open on your firewall
+
+#### Step 1: Clone the Repository
+
+```bash
+git clone https://github.com/petercort/dynamic-mcp-registry.git
+cd dynamic-mcp-registry
 ```
 
-### Azure API Center
+#### Step 2: Configure Environment
 
-This API is designed to be compatible with Azure API Center for enterprise deployment and management.
+Create a `.env` file (optional) or edit `docker-compose.yml` directly:
+
+```bash
+# .env
+NODE_ENV=production
+PORT=3000
+ALLOWED_ORIGINS=https://yourdomain.com,https://api-center.azure.com
+```
+
+#### Step 3: Update Domain Configuration
+
+Edit `docker-compose.yml` and replace the following placeholders:
+
+- `mcp-registry.yourdomain.com` → your actual domain
+- `admin@yourdomain.com` → your email for Let's Encrypt notifications
+
+#### Step 4: Deploy
+
+```bash
+# Start the services
+docker-compose up -d
+
+# Check the logs
+docker-compose logs -f mcp-registry
+
+# Verify health
+curl https://mcp-registry.yourdomain.com/api/v0/health
+```
+
+#### Step 5: Access Your API
+
+- **API Documentation**: `https://mcp-registry.yourdomain.com/api/docs`
+- **Health Check**: `https://mcp-registry.yourdomain.com/api/v0/health`
+- **MCP Servers List**: `https://mcp-registry.yourdomain.com/api/v0/servers`
+
+#### Managing the Deployment
+
+```bash
+# View logs
+docker-compose logs -f
+
+# Restart services
+docker-compose restart
+
+# Stop services
+docker-compose down
+
+# Update to latest version
+git pull
+docker-compose pull
+docker-compose up -d
+```
+
+### Alternative: Simple Docker Deployment
+
+For development or simple deployments without SSL:
+
+```bash
+# Build the image
+docker build -t mcp-registry .
+
+# Run the container
+docker run -d \
+  -p 3000:3000 \
+  -e NODE_ENV=production \
+  -e ALLOWED_ORIGINS=https://yourdomain.com \
+  --name mcp-registry \
+  --restart unless-stopped \
+  mcp-registry
+
+# Check health
+curl http://localhost:3000/api/v0/health
+```
+
+The included `Dockerfile` follows security best practices:
+- Uses Alpine Linux for minimal attack surface
+- Runs as non-root user
+- Includes built-in health checks
+- Minimal production dependencies
+
+### Cloud Deployment Options
+
+For cloud-specific deployments (Azure, AWS, GCP), see [AZURE_DEPLOYMENT.md](AZURE_DEPLOYMENT.md) for detailed guides.
 
 ## Testing
 
