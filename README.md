@@ -162,15 +162,53 @@ Each MCP server includes:
 
 ### Docker Deployment
 
-```dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY src/ ./src/
-EXPOSE 3000
-CMD ["npm", "start"]
+The project includes automated CI/CD using GitHub Actions that builds and publishes Docker images to GitHub Container Registry (ghcr.io).
+
+#### Using Pre-built Images
+
+Pull the latest image:
+```bash
+docker pull ghcr.io/petercort/dynamic-mcp-registry:latest
 ```
+
+Run the container:
+```bash
+docker run -d \
+  -p 3000:3000 \
+  -e NODE_ENV=production \
+  -e PORT=3000 \
+  -e ALLOWED_ORIGINS=https://your-domain.com \
+  --name mcp-registry \
+  ghcr.io/petercort/dynamic-mcp-registry:latest
+```
+
+#### Building Locally
+
+Build the image:
+```bash
+docker build -t mcp-registry .
+```
+
+The Dockerfile includes security best practices:
+- Non-root user execution
+- Minimal Alpine Linux base image
+- Health checks
+- Optimized npm cache handling
+
+#### CI/CD Pipeline
+
+The repository includes a GitHub Actions workflow that:
+- Runs tests on every push and pull request
+- Builds multi-platform Docker images (amd64, arm64)
+- Publishes images to GitHub Container Registry
+- Generates artifact attestations for security
+- Creates versioned tags for releases
+
+Images are automatically tagged with:
+- `latest` - Latest build from the main branch
+- `<branch>` - Specific branch builds
+- `v<version>` - Semantic version tags
+- `<branch>-<sha>` - Commit-specific builds
 
 ### Azure API Center
 
