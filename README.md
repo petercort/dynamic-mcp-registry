@@ -184,20 +184,16 @@ docker run -d \
 
 #### Building Locally
 
-```dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY src/ ./src/
-EXPOSE 3000
-CMD ["npm", "start"]
-```
-
 Build the image:
 ```bash
 docker build -t mcp-registry .
 ```
+
+The Dockerfile includes security best practices:
+- Non-root user execution
+- Minimal Alpine Linux base image
+- Health checks
+- Optimized npm cache handling
 
 #### CI/CD Pipeline
 
