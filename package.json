@@ -25,7 +25,7 @@
   "author": "Peter Cort",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.19.2",
+    "express": "^5.1.0",
     "cors": "^2.8.5",
     "helmet": "^8.0.0",
     "compression": "^1.7.4"
